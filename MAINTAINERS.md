@@ -1,3 +1,5 @@
 # MAINTAINERS
 
-Christopher Ferris - chrisfer@us.ibm.com
+Clifford Hansen - clh@us.ibm.com
+
+Ross Heninger - Ross.Heninger@ibm.com
