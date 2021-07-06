@@ -1,13 +1,9 @@
-# Changelog
+<!-- Use FEATURES, ENHANCEMENTS, BUG FIXES as categories describing content. -->
+<!-- Put most recent change at top. -->
 
-All notable changes to this project will be documented in this file.
+## 1.0.0 (July 6, 2021)
 
-## [Unreleased]
+FEATURES:
 
-## [0.0.1] - 2019-02-15
+* Initial version of TKE SDK source code
 
-### Added
-- Added a changelog
-
-[unreleased]: https://github.com/ibm/repo-template/compare/v0.0.1...HEAD
-[0.0.1]: https://github.com/ibm/repo-template/releases/tag/v0.0.1
