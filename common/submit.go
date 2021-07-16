@@ -299,6 +299,68 @@ func SubmitQueryDomainsRequest(req *rest.Request) ([]string, []string,
 		}
 	}
 
+	// Process failover HSMs
+	failover_hsms := outmap["failover_hsms"]
+	if failover_hsms != nil {
+		sourceHsmsArray, ok := failover_hsms.([]interface{})
+		if !ok {
+			return nil, nil, nil, nil, errors.New(
+				"Error querying crypto units." +
+					"\nUnexpected failover_hsms data, not an array.")
+		}
+
+		for _, hsm := range sourceHsmsArray {
+			hsmEntry, ok := hsm.(map[string]interface{})
+			if !ok {
+				return nil, nil, nil, nil, errors.New(
+					"Error querying crypto units." +
+						"\nUnexpected failover_hsms entry.")
+			}
+
+			hsm_id := hsmEntry["hsm_id"]
+			if hsm_id == nil {
+				return nil, nil, nil, nil, errors.New(
+					"Error querying crypto units." +
+						"\nhsm_id not found")
+			}
+			hsm_id_string, ok := hsm_id.(string)
+			if !ok {
+				return nil, nil, nil, nil, errors.New(
+					"Error querying crypto units." +
+						"\nhsm_id is not a string")
+			}
+			location := hsmEntry["location"]
+			if location == nil {
+				return nil, nil, nil, nil, errors.New(
+					"Error querying crypto units." +
+						"\nlocation not found")
+			}
+			location_string, ok := location.(string)
+			if !ok {
+				return nil, nil, nil, nil, errors.New(
+					"Error querying crypto units." +
+						"\nlocation is not a string")
+			}
+			serial_num := hsmEntry["serial_number"]
+			if serial_num == nil {
+				return nil, nil, nil, nil, errors.New(
+					"Error querying crypto units." +
+						"\nserial_number not found")
+			}
+			serial_num_string, ok := serial_num.(string)
+			if !ok {
+				return nil, nil, nil, nil, errors.New(
+					"Error querying crypto units." +
+						"\nserial_number is not a string")
+			}
+
+			hsm_ids = append(hsm_ids, hsm_id_string)
+			locations = append(locations, location_string)
+			serial_nums = append(serial_nums, serial_num_string)
+			hsm_types = append(hsm_types, "failover")
+		}
+	}
+
 	return hsm_ids, locations, serial_nums, hsm_types, nil
 }
 
