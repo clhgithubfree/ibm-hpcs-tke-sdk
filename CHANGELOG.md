@@ -1,11 +1,11 @@
 <!-- Use FEATURES, ENHANCEMENTS, BUG FIXES as categories describing content. -->
 <!-- Put most recent change at top. -->
 
-## 1.0.2 (July 22, 2021)
+## 1.0.2 (July 23, 2021)
 
-ENHANCEMENTS:
+BUG FIXES:
 
-* Documentation updates
+* Fix private endpoints, some message changes
 
 ## 1.0.1 (July 16, 2021)
 

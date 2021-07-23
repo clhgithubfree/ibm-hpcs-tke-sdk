@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 05/12/2021    CLH             Initial version
+// 07/23/2021    CLH             Report original error when verifying OA cert chain
 
 package tkesdk
 
@@ -153,7 +154,7 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 				}
 				err = ep11cmds.VerifyOA2Certificate(authToken, urlStart, de, 0, cert)
 				if err != nil {
-					return domains, errors.New("OA certificate verification failed for " + serialNum + " .")
+					return domains, err
 				} else {
 					certChainChecked[serialNum] = true
 				}
@@ -166,7 +167,7 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 				}
 				err = ep11cmds.VerifyCertificate(authToken, urlStart, de, 0, cert)
 				if err != nil {
-					return domains, errors.New("OA certificate verification failed for " + serialNum + ".")
+					return domains, err
 				} else {
 					certChainChecked[serialNum] = true
 				}
