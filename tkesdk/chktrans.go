@@ -7,11 +7,13 @@
 //
 // Date          Initials        Description
 // 05/03/2021    CLH             Initial version
+// 07/23/2021    CLH             Change message when a signature key cannot be used
 
 package tkesdk
 
 import (
 	"errors"
+	"os"
 	"strings"
 
 	"github.com/IBM/ibm-hpcs-tke-sdk/common"
@@ -90,7 +92,16 @@ func checkInputs(hc HsmConfig) ([]string, error) {
 			problems = append(problems, "An administrator name is too long.  Names must be 30 characters or less.")
 		}
 		if !validKey(admin) {
-			problems = append(problems, "The signature key associated with "+admin.Name+" could not be accessed.")
+			ssURL := os.Getenv("TKE_SIGNSERV_URL")
+			if ssURL != "" {
+				problems = append(problems, "The signature key associated with " +
+					admin.Name + " could not be accessed.  An attempt was made " +
+					"to use a signing service.  The signing service may not be " +
+					"running at the specified URL and port.")
+			} else {
+				problems = append(problems, "The signature key associated with " +
+					admin.Name + " could not be accessed.")
+			}
 			allKeysValid = false
 		}
 	}
