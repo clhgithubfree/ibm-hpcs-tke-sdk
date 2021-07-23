@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 07/04/2021    CLH             Adapt for TKE SDK
+// 07/23/2021    CLH             Fix URL for private endpoints
 
 package common
 
@@ -28,10 +29,10 @@ func GetBaseURL(apiEndPoint string, region string) (string, error) {
 		return "https://tke." + region + ".hs-crypto.test.cloud.ibm.com", nil
 	} else if apiEndPoint == "private.cloud.ibm.com" ||
 		apiEndPoint == "https://private.cloud.ibm.com" {
-		return "https://tke." + region + ".hs-crypto.private.cloud.ibm.com", nil
+		return "https://tke.private." + region + ".hs-crypto.cloud.ibm.com", nil
 	} else if apiEndPoint == "private.test.cloud.ibm.com" ||
 		apiEndPoint == "https://private.test.cloud.ibm.com" {
-		return "https://tke." + region + ".hs-crypto.private.test.cloud.ibm.com", nil
+		return "https://tke.private." + region + ".hs-crypto.test.cloud.ibm.com", nil
 	} else {
 		return "", errors.New("Invalid API endpoint")
 	}
