@@ -69,7 +69,7 @@ type CommonInputs struct {
 	ApiEndpoint string
 	AuthToken   string
 	InstanceId  string
-    SSUrl       string
+	SSUrl       string
 }
 
 

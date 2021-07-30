@@ -22,18 +22,6 @@ import (
 /* Structures for holding input and output values for TKE SDK functions       */
 /*----------------------------------------------------------------------------*/
 
-/*
-// Structure containing common inputs to TKE SDK commands
-// All TKE SDK commands need these inputs
-type CommonInputs struct {
-	Region      string
-	ApiEndpoint string
-	AuthToken   string
-	InstanceId  string
-    SSUrl       string
-}
-*/
-
 // Structure containing information on an installed administrator
 type ReturnedAdminInfo struct {
 	AdminName string
