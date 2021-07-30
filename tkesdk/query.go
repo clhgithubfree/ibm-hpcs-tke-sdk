@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 05/07/2021    CLH             Initial version
+// 07/29/2021    CLH             Add SSUrl to CommonInputs
 
 package tkesdk
 
@@ -21,6 +22,7 @@ import (
 /* Structures for holding input and output values for TKE SDK functions       */
 /*----------------------------------------------------------------------------*/
 
+/*
 // Structure containing common inputs to TKE SDK commands
 // All TKE SDK commands need these inputs
 type CommonInputs struct {
@@ -28,7 +30,9 @@ type CommonInputs struct {
 	ApiEndpoint string
 	AuthToken   string
 	InstanceId  string
+    SSUrl       string
 }
+*/
 
 // Structure containing information on an installed administrator
 type ReturnedAdminInfo struct {
@@ -78,8 +82,8 @@ type HsmConfig struct {
 /* Collects and returns information on how the crypto units assigned to a     */
 /* service instance are configured.                                           */
 /*----------------------------------------------------------------------------*/
-func Query(ci CommonInputs) ([]HsmInfo, error) {
-	hsmInfo, _, _, err := internalQuery(ci)
+func Query(ci common.CommonInputs) ([]HsmInfo, error) {
+	hsmInfo, _, err := internalQuery(ci)
 	return hsmInfo, err
 }
 
@@ -91,18 +95,18 @@ func Query(ci CommonInputs) ([]HsmInfo, error) {
 /* Inputs:                                                                    */
 /* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
 /*      functions.  This includes: the API endpoint and region, the HPCS      */
-/*      service instance id, and an IBM Cloud authentication token.           */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* []HsmInfo -- an array of structures with the current configuration         */
 /*      settings for each crypto unit in the service instance                 */
-/* string -- the base URL to use for requests to the IBM Cloud                */
 /* []common.DomainEntry -- identifies the set of crypto units assigned to     */
 /*      the service instance                                                  */
 /* error -- reports an error encountered when running the function, nil if    */
 /*      no error found                                                        */
 /*----------------------------------------------------------------------------*/
-func internalQuery(ci CommonInputs) ([]HsmInfo, string, []common.DomainEntry, error) {
+func internalQuery(ci common.CommonInputs) ([]HsmInfo, []common.DomainEntry, error) {
 
 	// Create an empty output array
 	hsmInfo := make([]HsmInfo, 0)
@@ -110,16 +114,10 @@ func internalQuery(ci CommonInputs) ([]HsmInfo, string, []common.DomainEntry, er
 	// Create an empty domains array
 	domains := make([]common.DomainEntry, 0)
 
-	// Determine the base URL for sending requests to the cloud
-	urlStart, err := common.GetBaseURL(ci.ApiEndpoint, ci.Region)
-	if err != nil {
-		return hsmInfo, "", domains, err
-	}
-
 	// Query to see what crypto units are assigned to the service instance
-	domains, err = getDomains(ci.AuthToken, urlStart, ci.InstanceId)
+	domains, err := getDomains(ci)
 	if err != nil {
-		return hsmInfo, urlStart, domains, err
+		return hsmInfo, domains, err
 	}
 
 	for _, domain := range domains {
@@ -132,33 +130,33 @@ func internalQuery(ci CommonInputs) ([]HsmInfo, string, []common.DomainEntry, er
 		nextHsm.HsmType = domain.Type
 
 		// Query the signature thresholds
-		domAttr, _, err := ep11cmds.QueryDomainAttributes(ci.AuthToken, urlStart, domain)
+		domAttr, _, err := ep11cmds.QueryDomainAttributes(ci, domain)
 		if err != nil {
-			return hsmInfo, urlStart, domains, err
+			return hsmInfo, domains, err
 		}
 		nextHsm.SignatureThreshold = int(domAttr.SignatureThreshold)
 		nextHsm.RevocationThreshold = int(domAttr.RevocationSignatureThreshold)
 
 		// Query domain administrators
-		domAdminSKIs, err := ep11cmds.QueryDomainAdmins(ci.AuthToken, urlStart, domain)
+		domAdminSKIs, err := ep11cmds.QueryDomainAdmins(ci, domain)
 		if err != nil {
-			return hsmInfo, urlStart, domains, err
+			return hsmInfo, domains, err
 		}
 		nextHsm.Admins = make([]ReturnedAdminInfo, len(domAdminSKIs))
 		for j := 0; j < len(domAdminSKIs); j++ {
 			nextHsm.Admins[j].AdminSKI = hex.EncodeToString(domAdminSKIs[j])
 
-			name, err := ep11cmds.QueryDomainAdminName(ci.AuthToken, urlStart, domain, domAdminSKIs[j])
+			name, err := ep11cmds.QueryDomainAdminName(ci, domain, domAdminSKIs[j])
 			if err != nil {
-				return hsmInfo, urlStart, domains, err
+				return hsmInfo, domains, err
 			}
 			nextHsm.Admins[j].AdminName = name
 		}
 
 		// Query master key register state and verification pattern
-		domainInfo, err := ep11cmds.QueryDomainInfo(ci.AuthToken, urlStart, domain)
+		domainInfo, err := ep11cmds.QueryDomainInfo(ci, domain)
 		if err != nil {
-			return hsmInfo, urlStart, domains, err
+			return hsmInfo, domains, err
 		}
 
 		nextHsm.NewMKStatus = convertMKStatusToString(domainInfo.NewMKStatus)
@@ -170,7 +168,7 @@ func internalQuery(ci CommonInputs) ([]HsmInfo, string, []common.DomainEntry, er
 		hsmInfo = append(hsmInfo, nextHsm)
 	}
 
-	return hsmInfo, urlStart, domains, nil
+	return hsmInfo, domains, nil
 }
 
 /*----------------------------------------------------------------------------*/

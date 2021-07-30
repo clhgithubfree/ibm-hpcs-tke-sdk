@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 05/12/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -28,8 +29,10 @@ import (
 /* com.ibm.tke.model.xcp.XCPCryptoModuleClass                                 */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies a domain assigned to the user.  The OA           */
 /*    certificate chain for the crypto module containing that domain is to    */
 /*    be verified.                                                            */
@@ -41,7 +44,7 @@ import (
 /* Outputs:                                                                   */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func VerifyOA2Certificate(authToken string, urlStart string, de common.DomainEntry,
+func VerifyOA2Certificate(ci common.CommonInputs, de common.DomainEntry,
 	certIndex uint32, aCertificate OA2CertificateX) error {
 
 	if common.ByteSlicesAreEqual(aCertificate.MetaDataSubjectSKI, aCertificate.MetaDataSignerSKI) {
@@ -51,7 +54,7 @@ func VerifyOA2Certificate(authToken string, urlStart string, de common.DomainEnt
 	var parentCert OA2CertificateX
 	parentExists := false
 	var xbytes, ybytes []byte
-	parentCertData, err := QueryDeviceCertificate(authToken, urlStart, de, certIndex+1)
+	parentCertData, err := QueryDeviceCertificate(ci, de, certIndex+1)
 	if err == nil {
 		parentExists = true
 		err = parentCert.Init(parentCertData)
@@ -150,7 +153,7 @@ func VerifyOA2Certificate(authToken string, urlStart string, de common.DomainEnt
 	// If a parent certificate was found, recursively call this function to
 	// verify the parent certificate
 	if parentExists {
-		return VerifyOA2Certificate(authToken, urlStart, de, certIndex+1, parentCert)
+		return VerifyOA2Certificate(ci, de, certIndex+1, parentCert)
 	} else {
 		return nil
 	}

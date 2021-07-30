@@ -8,6 +8,7 @@
 // Date          Initials        Description
 // 05/12/2021    CLH             Initial version
 // 07/23/2021    CLH             Report original error when verifying OA cert chain
+// 07/29/2021    CLH             Add SSUrl to CommonInputs
 
 package tkesdk
 
@@ -24,16 +25,17 @@ import (
 /* an HPCS service instance                                                   */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- IBM Cloud authority token to use for requests                 */
-/* urlStart -- base URL to use for requests to the IBM Cloud                  */
-/* cryptoInstance -- identifies the HPCS service instance to work with        */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* []common.DomainEntry -- describes the crypto units assigned to the         */
 /*     service instance                                                       */
 /* error -- reports any error found during processing                         */
 /*----------------------------------------------------------------------------*/
-func getDomains(authToken string, urlStart string, cryptoInstance string) ([]common.DomainEntry, error) {
+func getDomains(ci common.CommonInputs) ([]common.DomainEntry, error) {
 
 	// This function is based on code in tkefuncs/dlist.go.
 
@@ -41,7 +43,10 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 	domains := make([]common.DomainEntry, 0)
 
 	// Determine what crypto units are assigned to the service instance
-	req := common.CreateGetHsmsRequest(authToken, urlStart, cryptoInstance)
+	req, err := common.CreateGetHsmsRequest(ci)
+	if err != nil {
+		return domains, err
+	}
 	hsm_ids, locations, serial_nums, hsm_types, err := common.SubmitQueryDomainsRequest(req)
 	if err != nil {
 		return domains, err
@@ -65,7 +70,7 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 			de := common.DomainEntry{
 				0, // Domain_num -- don't care
 				hsm_ids[i],
-				cryptoInstance,
+				ci.InstanceId,
 				locations[i],
 				"",              // Serial_num -- don't care
 				"not available", // Public_key -- not available for initial read
@@ -73,8 +78,7 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 				false} // Selected -- don't care
 			// Read the epoch OA certificate with the current OA
 			// signature key
-			certbytes, err := ep11cmds.QueryDeviceCertificate(
-				authToken, urlStart, de, 0)
+			certbytes, err := ep11cmds.QueryDeviceCertificate(ci, de, 0)
 			if err != nil {
 				return domains, err
 			}
@@ -101,7 +105,7 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 			// Read the actual serial number for the crypto module
 			de.Public_key = mapLocationPublicKey[partialLocation]
 			// We want to check the OA signature on this query
-			_, resp, err := ep11cmds.QueryDomainAttributes(authToken, urlStart, de)
+			_, resp, err := ep11cmds.QueryDomainAttributes(ci, de)
 			if err != nil {
 				return domains, err
 			}
@@ -138,7 +142,7 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 			de := common.DomainEntry{
 				0,              // Domain_num -- don't care
 				hsm_ids[i],     // accurate, but don't care
-				cryptoInstance, // accurate, but don't care
+				ci.InstanceId, // accurate, but don't care
 				locations[i],
 				serialNum, // accurate, but don't care
 				newkey,    // Public_key
@@ -152,7 +156,7 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 				if err != nil {
 					return domains, err
 				}
-				err = ep11cmds.VerifyOA2Certificate(authToken, urlStart, de, 0, cert)
+				err = ep11cmds.VerifyOA2Certificate(ci, de, 0, cert)
 				if err != nil {
 					return domains, err
 				} else {
@@ -165,7 +169,7 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 				if err != nil {
 					return domains, err
 				}
-				err = ep11cmds.VerifyCertificate(authToken, urlStart, de, 0, cert)
+				err = ep11cmds.VerifyCertificate(ci, de, 0, cert)
 				if err != nil {
 					return domains, err
 				} else {
@@ -185,7 +189,7 @@ func getDomains(authToken string, urlStart string, cryptoInstance string) ([]com
 			common.DomainEntry{
 				domainNum,
 				hsm_ids[i],
-				cryptoInstance,
+				ci.InstanceId,
 				locations[i],
 				serialNum,
 				mapLocationPublicKey[partialLocation],

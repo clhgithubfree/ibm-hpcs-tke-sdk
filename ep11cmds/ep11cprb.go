@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/09/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -453,13 +454,13 @@ func CreateQueryHTPRequest(cryptoModuleIndex int, domainIndex int,
 /* The number of signature keys provided indicates the number of signatures   */
 /* that need to be collected for the command.                                 */
 /*----------------------------------------------------------------------------*/
-func CreateSignedHTPRequest(authToken string, urlStart string, de common.DomainEntry,
+func CreateSignedHTPRequest(ci common.CommonInputs, de common.DomainEntry,
 	adminBlock AdminBlk, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) (string, error) {
 
 	// Issue Query Domain Attributes to get the administrative domain, the
 	// module identifier, and the transaction counter.
-	_, adminRspBlk, err := QueryDomainAttributes(authToken, urlStart, de)
+	_, adminRspBlk, err := QueryDomainAttributes(ci, de)
 	if err != nil {
 		return "", err
 	}
@@ -477,7 +478,7 @@ func CreateSignedHTPRequest(authToken string, urlStart string, de common.DomainE
 	}
 
 	signerInfo, err := CreateSignerInfo(adminBlockSeq, sigkeys, sigkeySkis,
-		sigkeyTokens)
+		sigkeyTokens, ci.SSUrl)
 	if err != nil {
 		return "", err
 	}

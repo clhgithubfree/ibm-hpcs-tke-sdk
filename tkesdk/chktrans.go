@@ -8,12 +8,12 @@
 // Date          Initials        Description
 // 05/03/2021    CLH             Initial version
 // 07/23/2021    CLH             Change message when a signature key cannot be used
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package tkesdk
 
 import (
 	"errors"
-	"os"
 	"strings"
 
 	"github.com/IBM/ibm-hpcs-tke-sdk/common"
@@ -26,7 +26,8 @@ import (
 /* Inputs:                                                                    */
 /* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
 /*      functions.  This includes: the API endpoint and region, the HPCS      */
-/*      service instance id, and an IBM Cloud authentication token.           */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* HsmConfig -- A structure containing information from the hsm_config        */
 /*      section of the resource block for the HPCS service instance.  This    */
 /*      provides access to signature keys for signing commands to crypto      */
@@ -38,10 +39,10 @@ import (
 /*      not possible                                                          */
 /* error -- identifies any error encountered when running the function        */
 /*----------------------------------------------------------------------------*/
-func CheckTransition(ci CommonInputs, hc HsmConfig) ([]string, error) {
+func CheckTransition(ci common.CommonInputs, hc HsmConfig) ([]string, error) {
 
 	// Check inputs in the resource block
-	problems, err := checkInputs(hc)
+	problems, err := checkInputs(ci, hc)
 	if err != nil {
 		return make([]string, 0), err
 	}
@@ -50,7 +51,7 @@ func CheckTransition(ci CommonInputs, hc HsmConfig) ([]string, error) {
 	}
 
 	// Read the initial configuration
-	hsminfo, _, _, err := internalQuery(ci)
+	hsminfo, _, err := internalQuery(ci)
 	if err != nil {
 		return make([]string, 0), err
 	}
@@ -67,7 +68,7 @@ func CheckTransition(ci CommonInputs, hc HsmConfig) ([]string, error) {
 /*----------------------------------------------------------------------------*/
 /* Check for problems with the inputs specified by the user.                  */
 /*----------------------------------------------------------------------------*/
-func checkInputs(hc HsmConfig) ([]string, error) {
+func checkInputs(ci common.CommonInputs, hc HsmConfig) ([]string, error) {
 
 	problems := make([]string, 0)
 	if hc.SignatureThreshold < 1 || hc.SignatureThreshold > 8 {
@@ -91,9 +92,8 @@ func checkInputs(hc HsmConfig) ([]string, error) {
 		if len(admin.Name) > 30 {
 			problems = append(problems, "An administrator name is too long.  Names must be 30 characters or less.")
 		}
-		if !validKey(admin) {
-			ssURL := os.Getenv("TKE_SIGNSERV_URL")
-			if ssURL != "" {
+		if !validKey(admin,ci.SSUrl) {
+			if ci.SSUrl != "" {
 				problems = append(problems, "The signature key associated with " +
 					admin.Name + " could not be accessed.  An attempt was made " +
 					"to use a signing service.  The signing service may not be " +
@@ -107,7 +107,7 @@ func checkInputs(hc HsmConfig) ([]string, error) {
 	}
 
 	if allKeysValid {
-		uniqueKeys, err := keysAreUnique(hc.Admins)
+		uniqueKeys, err := keysAreUnique(hc.Admins, ci.SSUrl)
 		if err != nil {
 			return problems, err
 		}
@@ -125,7 +125,8 @@ func checkInputs(hc HsmConfig) ([]string, error) {
 /* Inputs:                                                                    */
 /* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
 /*      functions.  This includes: the API endpoint and region, the HPCS      */
-/*      service instance id, and an IBM Cloud authentication token.           */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* HsmConfig -- A structure containing information from the hsm_config        */
 /*      section of the resource block for the HPCS service instance.  This    */
 /*      provides access to signature keys for signing commands to crypto      */
@@ -148,7 +149,7 @@ func checkInputs(hc HsmConfig) ([]string, error) {
 /* [][]string -- the Subject Key Identifiers of the existing administrators   */
 /*      to be removed from the crypto unit                                    */
 /*----------------------------------------------------------------------------*/
-func internalCheckTransition(ci CommonInputs, hc HsmConfig,
+func internalCheckTransition(ci common.CommonInputs, hc HsmConfig,
 	hsminfo []HsmInfo) ([]string, error, [][]string, [][]string, [][]string) {
 
 	// Initialize the output variables
@@ -170,7 +171,7 @@ func internalCheckTransition(ci CommonInputs, hc HsmConfig,
 	}
 
 	// Determine the desired final set of administrator SKIs for all crypto units
-	finalSKIs, _, _, adminNameMap, err := GetSignatureKeysFromResourceBlock(hc)
+	finalSKIs, _, _, adminNameMap, err := GetSignatureKeysFromResourceBlock(hc, ci.SSUrl)
 	if err != nil {
 		return problems, err, allKeepSKIs, allAddSKIs, allRmvSKIs
 	}
@@ -314,7 +315,7 @@ func internalCheckTransition(ci CommonInputs, hc HsmConfig,
 /*----------------------------------------------------------------------------*/
 /* Checks whether a signature key can be used.                                */
 /*----------------------------------------------------------------------------*/
-func validKey(ai AdminInfo) bool {
+func validKey(ai AdminInfo, ssURL string) bool {
 
 	// Tries to sign some data.  If successful, the signature key can be used.
 
@@ -322,26 +323,27 @@ func validKey(ai AdminInfo) bool {
 	// signature keys accessed by a signing service.
 
 	dataToSign := make([]byte, 100)
-	_, err := common.SignWithSignatureKey(dataToSign, ai.Key, ai.Token)
+	_, err := common.SignWithSignatureKey(dataToSign, ai.Key, ai.Token, ssURL)
 	return err == nil
 }
 
 /*----------------------------------------------------------------------------*/
 /* Checks that a unique key is specified for each administrator.              */
 /*                                                                            */
-/* Input:                                                                     */
+/* Inputs:                                                                    */
 /* []AdminInfo -- administrator signature key information from the Terraform  */
 /*     resource block                                                         */
+/* ssURL string -- the URL and port for a signing service, if one is used     */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* bool -- true if unique signature keys are specified, false if a signature  */
 /*     key is specified more than once                                        */
 /* error -- reports any error found during processing                         */
 /*----------------------------------------------------------------------------*/
-func keysAreUnique(admins []AdminInfo) (bool, error) {
+func keysAreUnique(admins []AdminInfo, ssURL string) (bool, error) {
 	skis := make(map[string]bool)
 	for _, admin := range admins {
-		ski, err := GetSigKeySKI(admin.Key, admin.Token)
+		ski, err := GetSigKeySKI(admin.Key, admin.Token, ssURL)
 		if err != nil {
 			return false, err
 		}

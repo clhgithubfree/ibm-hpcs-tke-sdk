@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/29/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -20,8 +21,10 @@ import (
 /* Removes an administrator                                                   */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain with the administrator to be removed  */
 /* string -- the Subject Key Identifier of the administator to be removed     */
 /* []string -- identifies the signature keys to use to sign the command       */
@@ -31,9 +34,8 @@ import (
 /* Outputs:                                                                   */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func RemoveDomainAdministrator(authToken string, urlStart string,
-	de common.DomainEntry, ski string, sigkeys []string,
-	sigkeySkis []string, sigkeyTokens []string) error {
+func RemoveDomainAdministrator(ci common.CommonInputs, de common.DomainEntry,
+	ski string, sigkeys []string, sigkeySkis []string, sigkeyTokens []string) error {
 
 	// Convert from hexadecimal string to []byte
 	skibytes, err := hex.DecodeString(ski)
@@ -41,14 +43,16 @@ func RemoveDomainAdministrator(authToken string, urlStart string,
 		return err
 	}
 
-	htpRequestString, err := RemoveDomainAdminReq(authToken, urlStart, de,
-		skibytes, sigkeys, sigkeySkis, sigkeyTokens)
+	htpRequestString, err := RemoveDomainAdminReq(ci, de, skibytes, sigkeys,
+		sigkeySkis, sigkeyTokens)
 	if err != nil {
 		return err
 	}
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -66,14 +70,12 @@ func RemoveDomainAdministrator(authToken string, urlStart string,
 /*----------------------------------------------------------------------------*/
 /* Creates the HTPRequest for removing a domain administrator                 */
 /*----------------------------------------------------------------------------*/
-func RemoveDomainAdminReq(authToken string, urlStart string,
-	de common.DomainEntry, ski []byte, sigkeys []string,
-	sigkeySkis []string, sigkeyTokens []string) (string, error) {
+func RemoveDomainAdminReq(ci common.CommonInputs, de common.DomainEntry,
+	ski []byte, sigkeys []string, sigkeySkis []string, sigkeyTokens []string) (string, error) {
 
 	var adminBlk AdminBlk
 	adminBlk.CmdID = XCP_ADM_DOM_ADMIN_LOGOUT
 	// DomainID, ModuleID, and TransactionCounter get filled in later when sending the request
 	adminBlk.CmdInput = ski
-	return CreateSignedHTPRequest(authToken, urlStart, de, adminBlk, sigkeys,
-		sigkeySkis, sigkeyTokens)
+	return CreateSignedHTPRequest(ci, de, adminBlk, sigkeys, sigkeySkis, sigkeyTokens)
 }

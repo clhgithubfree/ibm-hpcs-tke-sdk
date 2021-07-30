@@ -7,12 +7,12 @@
 //
 // Date          Initials        Description
 // 06/21/2021    CLH             Initial version
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package tkesdk
 
 import (
 	"errors"
-	"os"
 
 	"github.com/IBM/ibm-hpcs-tke-sdk/common"
 	"github.com/IBM/ibm-hpcs-tke-sdk/ep11cmds"
@@ -25,7 +25,8 @@ import (
 /* Inputs:                                                                    */
 /* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
 /*      functions.  This includes: the API endpoint and region, the HPCS      */
-/*      service instance id, and an IBM Cloud authentication token.           */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* HsmConfig -- A structure containing information from the hsm_config        */
 /*      section of the resource block for the HPCS service instance.  This    */
 /*      provides access to signature keys for signing commands to crypto      */
@@ -37,10 +38,10 @@ import (
 /*      not possible                                                          */
 /* error -- identifies any error encountered when running the function        */
 /*----------------------------------------------------------------------------*/
-func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
+func Update(ci common.CommonInputs, hc HsmConfig) ([]string, error) {
 
 	// Check inputs in the resource block
-	problems, err := checkInputs(hc)
+	problems, err := checkInputs(ci, hc)
 	if err != nil {
 		return make([]string, 0), err
 	}
@@ -49,7 +50,10 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 	}
 
 	// Read the initial configuration
-	hsminfo, urlStart, domains, err := internalQuery(ci)
+	hsminfo, domains, err := internalQuery(ci)
+	if err != nil {
+		return make([]string, 0), err
+	}
 
 	// Check for invalid transitions
 	problems, err, keepSKIs, addSKIs, rmvSKIs := internalCheckTransition(ci, hc, hsminfo)
@@ -74,8 +78,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 			sigkeys := make([]string, 0)
 			sigkeySkis := make([]string, 0)
 			sigkeyTokens := make([]string, 0)
-			err := ep11cmds.ZeroizeDomain(ci.AuthToken, urlStart, domains[i],
-				sigkeys, sigkeySkis, sigkeyTokens)
+			err := ep11cmds.ZeroizeDomain(ci, domains[i], sigkeys, sigkeySkis,
+				sigkeyTokens)
 			if err != nil {
 				return problems, err
 			}
@@ -85,7 +89,7 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 	// refetch the initial configuration and redetermine what administrators
 	// to keep, add, and remove.
 	if anyAdminsRemoved {
-		hsminfo, urlStart, domains, err = internalQuery(ci)
+		hsminfo, domains, err = internalQuery(ci)
 		if err != nil {
 			return problems, err
 		}
@@ -100,7 +104,7 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 	// Identify what signature keys are in the resource block
 	suppliedSKIs, sigKeyMap, sigKeyTokenMap, adminNameMap, err :=
-		GetSignatureKeysFromResourceBlock(hc)
+		GetSignatureKeysFromResourceBlock(hc, ci.SSUrl)
 	if err != nil {
 		return make([]string, 0), err
 	}
@@ -110,7 +114,7 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 	// Maps SKI --> administrator certificate
 	for ski := range suppliedSKIs {
 		cert, err := createAdminCert(ski, sigKeyMap[ski],
-			sigKeyTokenMap[ski], adminNameMap[ski])
+			sigKeyTokenMap[ski], adminNameMap[ski], ci.SSUrl)
 		if err != nil {
 			return make([]string, 0), err
 		}
@@ -138,8 +142,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 			// Remove administrators
 			for _, ski := range rmvSKIs[i] {
-				err = ep11cmds.RemoveDomainAdministrator(ci.AuthToken,
-					urlStart, domain, ski, sigkeys, sigkeySkis, sigkeyTokens)
+				err = ep11cmds.RemoveDomainAdministrator(ci, domain, ski,
+					sigkeys, sigkeySkis, sigkeyTokens)
 				if err != nil {
 					return make([]string, 0), err
 				}
@@ -153,8 +157,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 			// Add administrators
 			for _, ski := range addSKIs[i] {
-				err = ep11cmds.AddDomainAdmin(ci.AuthToken, urlStart, domain,
-					certMap[ski], sigkeys, sigkeySkis, sigkeyTokens)
+				err = ep11cmds.AddDomainAdmin(ci, domain, certMap[ski],
+					sigkeys, sigkeySkis, sigkeyTokens)
 				if err != nil {
 					return make([]string, 0), err
 				}
@@ -177,9 +181,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 			}
 
 			// Change the signature thresholds and other domain attributes
-			err = SetDomainAttributes(ci.AuthToken, urlStart, domain,
-				hc.SignatureThreshold, hc.RevocationThreshold,
-				sigkeys, sigkeySkis, sigkeyTokens)
+			err = SetDomainAttributes(ci, domain, hc.SignatureThreshold,
+				hc.RevocationThreshold, sigkeys, sigkeySkis, sigkeyTokens)
 			if err != nil {
 				return make([]string, 0), err
 			}
@@ -200,9 +203,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 			// Keep current signature threshold but change the revocation
 			// threshold
-			err = SetDomainAttributes(ci.AuthToken, urlStart, domain,
-				hsminfo[i].SignatureThreshold, hc.RevocationThreshold,
-				sigkeys, sigkeySkis, sigkeyTokens)
+			err = SetDomainAttributes(ci, domain, hsminfo[i].SignatureThreshold,
+				hc.RevocationThreshold, sigkeys, sigkeySkis, sigkeyTokens)
 			if err != nil {
 				return make([]string, 0), err
 			}
@@ -215,8 +217,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 			// Remove administrators
 			for _, ski := range rmvSKIs[i] {
-				err = ep11cmds.RemoveDomainAdministrator(ci.AuthToken,
-					urlStart, domain, ski, sigkeys, sigkeySkis, sigkeyTokens)
+				err = ep11cmds.RemoveDomainAdministrator(ci, domain, ski,
+					sigkeys, sigkeySkis, sigkeyTokens)
 				if err != nil {
 					return make([]string, 0), err
 				}
@@ -230,8 +232,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 			// Add administrators
 			for _, ski := range addSKIs[i] {
-				err = ep11cmds.AddDomainAdmin(ci.AuthToken, urlStart, domain,
-					certMap[ski], sigkeys, sigkeySkis, sigkeyTokens)
+				err = ep11cmds.AddDomainAdmin(ci, domain, certMap[ski],
+					sigkeys, sigkeySkis, sigkeyTokens)
 				if err != nil {
 					return make([]string, 0), err
 				}
@@ -239,9 +241,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 			// Change the signature threshold
 			// Can use the same signature keys as the previous operation
-			err = SetDomainAttributes(ci.AuthToken, urlStart, domain,
-				hc.SignatureThreshold, hc.RevocationThreshold,
-				sigkeys, sigkeySkis, sigkeyTokens)
+			err = SetDomainAttributes(ci, domain, hc.SignatureThreshold,
+				hc.RevocationThreshold, sigkeys, sigkeySkis, sigkeyTokens)
 			if err != nil {
 				return make([]string, 0), err
 			}
@@ -261,8 +262,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 			// Add administrators
 			for _, ski := range addSKIs[i] {
-				err = ep11cmds.AddDomainAdmin(ci.AuthToken, urlStart, domain,
-					certMap[ski], sigkeys, sigkeySkis, sigkeyTokens)
+				err = ep11cmds.AddDomainAdmin(ci, domain, certMap[ski],
+					sigkeys, sigkeySkis, sigkeyTokens)
 				if err != nil {
 					return make([]string, 0), err
 				}
@@ -278,8 +279,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 			// Remove administrators
 			for _, ski := range rmvSKIs[i] {
-				err = ep11cmds.RemoveDomainAdministrator(ci.AuthToken,
-					urlStart, domain, ski, sigkeys, sigkeySkis, sigkeyTokens)
+				err = ep11cmds.RemoveDomainAdministrator(ci, domain, ski,
+					sigkeys, sigkeySkis, sigkeyTokens)
 				if err != nil {
 					return make([]string, 0), err
 				}
@@ -292,9 +293,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 					hsminfo[i].SignatureThreshold)
 
 			// Change the signature thresholds
-			err = SetDomainAttributes(ci.AuthToken, urlStart, domain,
-				hc.SignatureThreshold, hc.RevocationThreshold,
-				sigkeys, sigkeySkis, sigkeyTokens)
+			err = SetDomainAttributes(ci, domain, hc.SignatureThreshold,
+				hc.RevocationThreshold, sigkeys, sigkeySkis, sigkeyTokens)
 			if err != nil {
 				return make([]string, 0), err
 			}
@@ -361,8 +361,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 		}
 
 		// Create a random WK in the recovery crypto unit
-		err, _ := ep11cmds.CreateRandomWK(ci.AuthToken, urlStart, recoveryHSM,
-			singleSigkey, singleSigkeySki, singleSigkeyToken)
+		err, _ := ep11cmds.CreateRandomWK(ci, recoveryHSM, singleSigkey,
+			singleSigkeySki, singleSigkeyToken)
 		if err != nil {
 			return make([]string, 0), err
 		}
@@ -393,8 +393,7 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 
 				// Generate an importer key in the target domain
 				pubKey, _, err := ep11cmds.GenerateP521ECImporterKey(
-					ci.AuthToken, urlStart, domain, singleSigkey,
-					singleSigkeySki, singleSigkeyToken)
+					ci, domain, singleSigkey, singleSigkeySki, singleSigkeyToken)
 				if err != nil {
 					return make([]string, 0), err
 				}
@@ -403,8 +402,8 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 				// the importer key
 				kphcert := ep11cmds.KPHCert(pubKey)
 				pfile := ep11cmds.ExportWKParameterFile(kphcert)
-				pdata, err := ep11cmds.ExportWK(ci.AuthToken, urlStart,
-					recoveryHSM, pfile, sigkeys, sigkeySkis, sigkeyTokens)
+				pdata, err := ep11cmds.ExportWK(ci, recoveryHSM, pfile,
+					sigkeys, sigkeySkis, sigkeyTokens)
 				if err != nil {
 					return make([]string, 0), err
 				}
@@ -420,22 +419,22 @@ func Update(ci CommonInputs, hc HsmConfig) ([]string, error) {
 				recipientInfo = append(recipientInfo, pMap.GetDataUsingIndex(common.PMTAG_ENCR_KEY_PART, 0))
 
 				// Import the master key to the target domain
-				err = ep11cmds.ImportWK(ci.AuthToken, urlStart, domain, recipientInfo,
+				err = ep11cmds.ImportWK(ci, domain, recipientInfo,
 					singleSigkey, singleSigkeySki, singleSigkeyToken)
 				if err != nil {
 					return make([]string, 0), err
 				}
 
 				// Commit the imported master key
-				err = ep11cmds.CommitPendingWK(ci.AuthToken, urlStart, domain,
-					sigkeys, sigkeySkis, sigkeyTokens)
+				err = ep11cmds.CommitPendingWK(ci, domain, sigkeys,
+					sigkeySkis, sigkeyTokens)
 				if err != nil {
 					return make([]string, 0), err
 				}
 
 				// Finalize the imported master key
-				err = ep11cmds.FinalizeWK(ci.AuthToken, urlStart, domain,
-					singleSigkey, singleSigkeySki, singleSigkeyToken)
+				err = ep11cmds.FinalizeWK(ci, domain, singleSigkey,
+					singleSigkeySki, singleSigkeyToken)
 				if err != nil {
 					return make([]string, 0), err
 				}
@@ -494,15 +493,16 @@ func collectSigKeys(allowedSKIs []string, sigKeyMap map[string]string,
 /* string -- Key parameter for the signature key to be used                   */
 /* string -- Token parameter for the signature key to be used                 */
 /* string -- the name to be placed in the certificate                         */
+/* string -- the URL and port where a signing service is running, if one      */
+/*     should be used                                                         */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* []byte -- the administrator certificate                                    */
 /* error -- identifies any error encountered during processing                */
 /*----------------------------------------------------------------------------*/
 func createAdminCert(ski string, sigkey string, sigkeyToken string,
-	adminName string) ([]byte, error) {
+	adminName string, ssURL string) ([]byte, error) {
 
-	ssURL := os.Getenv("TKE_SIGNSERV_URL")
 	if ssURL != "" {
 		return ep11cmds.CreateAdminCertUsingSigningService(ssURL, sigkey, sigkeyToken, adminName)
 	} else {
@@ -515,8 +515,10 @@ func createAdminCert(ski string, sigkey string, sigkeyToken string,
 /* HSMs and operational HSMs.                                                 */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* PluginContext -- contains the IAM access token and parameters identifying  */
-/*    what resource group the user is working with                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose attributes are to be set        */
 /* int -- new signature threshold value to set                                */
 /* int -- new revocation signature threshold value to set                     */
@@ -527,13 +529,12 @@ func createAdminCert(ski string, sigkey string, sigkeyToken string,
 /* Output:                                                                    */
 /* error -- reports any errors accessing the domain                           */
 /*----------------------------------------------------------------------------*/
-func SetDomainAttributes(authToken string, urlStart string,
-	domain common.DomainEntry, newSigThr int, newRevThr int,
-	sigkeys []string, sigkeySkis []string, sigkeyTokens []string) error {
+func SetDomainAttributes(ci common.CommonInputs, domain common.DomainEntry,
+	newSigThr int, newRevThr int, sigkeys []string, sigkeySkis []string,
+	sigkeyTokens []string) error {
 
 	// Get the current domain attributes
-	domainAttributes, _, err := ep11cmds.QueryDomainAttributes(
-		authToken, urlStart, domain)
+	domainAttributes, _, err := ep11cmds.QueryDomainAttributes(ci, domain)
 	if err != nil {
 		return err
 	}
@@ -600,8 +601,7 @@ func SetDomainAttributes(authToken string, urlStart string,
 	domainAttributes.RevocationSignatureThreshold = uint32(newRevThr)
 
 	err = ep11cmds.SetDomainAttributes(
-		authToken, urlStart, domain, domainAttributes, sigkeys, sigkeySkis,
-		sigkeyTokens)
+		ci, domain, domainAttributes, sigkeys, sigkeySkis, sigkeyTokens)
 	if err != nil {
 		return err
 	}

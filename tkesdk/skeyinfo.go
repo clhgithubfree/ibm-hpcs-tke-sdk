@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/30/2021    CLH             Initial version
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package tkesdk
 
@@ -17,7 +18,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"math/big"
-	"os"
 	"strconv"
 	"strings"
 
@@ -41,6 +41,7 @@ type ECPublicKey struct {
 /* HsmConfig -- A structure containing information from the hsm_config        */
 /*     section of the resource block for the HPCS service instance.  This     */
 /*     provides access to the signature keys for signing commands.            */
+/* ssURL string -- the URL and port for a signing service, if one is used     */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* map[string]bool -- set of the Subject Key Identifiers for the signature    */
@@ -50,7 +51,7 @@ type ECPublicKey struct {
 /* map[string]string -- maps SKI --> administrator name                       */
 /* error -- reports any error during processing                               */
 /*----------------------------------------------------------------------------*/
-func GetSignatureKeysFromResourceBlock(hc HsmConfig) (map[string]bool,
+func GetSignatureKeysFromResourceBlock(hc HsmConfig, ssURL string) (map[string]bool,
 	map[string]string, map[string]string, map[string]string, error) {
 
 	// Set of Subject Key Identifiers
@@ -64,7 +65,7 @@ func GetSignatureKeysFromResourceBlock(hc HsmConfig) (map[string]bool,
 	adminNameMap := make(map[string]string)
 
 	for i := 0; i < len(hc.Admins); i++ {
-		ski, err := GetSigKeySKI(hc.Admins[i].Key, hc.Admins[i].Token)
+		ski, err := GetSigKeySKI(hc.Admins[i].Key, hc.Admins[i].Token, ssURL)
 		if err != nil {
 			return suppliedSKIs, sigKeyMap, sigKeyTokenMap, adminNameMap, err
 		}
@@ -90,17 +91,15 @@ func GetSignatureKeysFromResourceBlock(hc HsmConfig) (map[string]bool,
 /* sigkey string -- a string identifying which signature key to access        */
 /* sigkeyToken string -- associated authentication token for the signature    */
 /*     key                                                                    */
+/* ssURL string -- the URL and port for a signing service, if one is used     */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* string -- Subject Key Identifier for the signature key, represented as a   */
 /*     hexadecimal string.                                                    */
 /* error -- reports any error during processing                               */
 /*----------------------------------------------------------------------------*/
-func GetSigKeySKI(sigkey string, sigkeyToken string) (string, error) {
+func GetSigKeySKI(sigkey string, sigkeyToken string, ssURL string) (string, error) {
 
-	// Check if the environment variable is set indicating a signing service
-	// should be used
-	ssURL := os.Getenv("TKE_SIGNSERV_URL")
 	if ssURL != "" {
 
 		// Use the signing service to get the public key

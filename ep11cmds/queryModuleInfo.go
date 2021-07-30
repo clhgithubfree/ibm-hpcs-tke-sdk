@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/07/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -37,22 +38,26 @@ type ModuleInfoRspInfo struct {
 /* Issues get_xcp_info to retrieve module information                         */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the crypto module and domain to be queried       */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* ModuleInfoRspInfo -- returned data from the query                          */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func QueryModuleInfo(authToken string, urlStart string,
-	de common.DomainEntry) (ModuleInfoRspInfo, error) {
+func QueryModuleInfo(ci common.CommonInputs, de common.DomainEntry) (ModuleInfoRspInfo, error) {
 
 	htpRequestString := QueryModuleInfoRequest(
 		de.GetCryptoModuleIndex(), de.GetDomainIndex())
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		var dummy ModuleInfoRspInfo
+		return dummy, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {

@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/07/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -23,8 +24,10 @@ import (
 /* Queries the domain administrators.                                         */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain to be queried                         */
 /*                                                                            */
 /* Outputs:                                                                   */
@@ -32,14 +35,15 @@ import (
 /*    administrator installed in the domain                                   */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func QueryDomainAdmins(authToken string, urlStart string,
-	de common.DomainEntry) ([][]byte, error) {
+func QueryDomainAdmins(ci common.CommonInputs, de common.DomainEntry) ([][]byte, error) {
 
 	htpRequestString := QueryDomainAdminsReq(
 		de.GetCryptoModuleIndex(), de.GetDomainIndex(), nil)
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString) //@TxxxxxxCLH
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return nil, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -54,8 +58,10 @@ func QueryDomainAdmins(authToken string, urlStart string,
 /* Retrieves the name of a domain administrator.                              */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain to be queried                         */
 /* []byte -- Subject Key Identifier of the domain administrator of interest   */
 /*                                                                            */
@@ -63,14 +69,16 @@ func QueryDomainAdmins(authToken string, urlStart string,
 /* string -- name of the domain administrator                                 */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func QueryDomainAdminName(authToken string, urlStart string,
-	de common.DomainEntry, ski []byte) (string, error) {
+func QueryDomainAdminName(ci common.CommonInputs, de common.DomainEntry,
+	ski []byte) (string, error) {
 
 	htpRequestString := QueryDomainAdminsReq(
 		de.GetCryptoModuleIndex(), de.GetDomainIndex(), ski)
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return "", err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -87,20 +95,6 @@ SKI for an administrator or be nil.
 */
 func QueryDomainAdminsReq(cryptoModuleIndex int, domainIndex int, aSKI []byte) string {
 	var adminCmd AdminBlk
-
-	//TODO
-	/*
-		if domainIndex == 21 {
-			domainIndex = 0
-			fmt.Println("changing domain index to 0...")
-		}
-
-		if cryptoModuleIndex == 06 {
-			cryptoModuleIndex = 07
-			fmt.Println("changing crypto module index to 07...")
-		}
-	*/
-
 	adminCmd.CmdID = XCP_ADMQ_DOMADMIN
 	adminCmd.DomainID = BuildAdminDomainIndex(domainIndex)
 	if aSKI != nil {

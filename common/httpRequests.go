@@ -8,6 +8,7 @@
 // Date          Initials        Description
 // 07/04/2021    CLH             Adapt for TKE SDK
 // 07/23/2021    CLH             Fix URL for private endpoints
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package common
 
@@ -19,7 +20,7 @@ import (
 /*----------------------------------------------------------------------------*/
 /* Determines the base URL to use for HTTP requests to the IBM Cloud          */
 /*----------------------------------------------------------------------------*/
-func GetBaseURL(apiEndPoint string, region string) (string, error) {
+func getBaseURL(apiEndPoint string, region string) (string, error) {
 
 	if apiEndPoint == "cloud.ibm.com" ||
 		apiEndPoint == "https://cloud.ibm.com" {
@@ -41,39 +42,47 @@ func GetBaseURL(apiEndPoint string, region string) (string, error) {
 /*----------------------------------------------------------------------------*/
 /* Creates the HTTP request for querying the domains for a crypto instance.   */
 /*----------------------------------------------------------------------------*/
-func CreateGetHsmsRequest(authToken string, urlStart string,
-	cryptoInstance string) *rest.Request {
+func CreateGetHsmsRequest(ci CommonInputs) (*rest.Request, error) {
 
-	url := urlStart + "/v1/tke/" + cryptoInstance + "/hsms"
+	urlStart, err := getBaseURL(ci.ApiEndpoint, ci.Region)
+	if err != nil {
+		return nil, err
+	}
+
+	url := urlStart + "/v1/tke/" + ci.InstanceId + "/hsms"
 	req := rest.GetRequest(url)
 	req.Set("Content-type", "application/json")
-	req.Set("Authorization", authToken)
-	return req
+	req.Set("Authorization", ci.AuthToken)
+	return req, nil
 }
 
 /*----------------------------------------------------------------------------*/
 /* Creates the HTTP request for sending an HTPRequest to a TKE catcher        */
 /* program.                                                                   */
 /*----------------------------------------------------------------------------*/
-func CreatePostHsmsRequest(authToken string, urlStart string,
-	cryptoInstance string, hsmId string, htpRequest string) *rest.Request {
+func CreatePostHsmsRequest(ci CommonInputs, hsmId string, htpRequest string) (*rest.Request, error) {
 
-	url := urlStart + "/v1/tke/" + cryptoInstance + "/hsms/" + hsmId
+	urlStart, err := getBaseURL(ci.ApiEndpoint, ci.Region)
+	if err != nil {
+		return nil, err
+	}
+
+	url := urlStart + "/v1/tke/" + ci.InstanceId + "/hsms/" + hsmId
 	req := rest.PostRequest(url)
 	req.Set("Content-type", "application/json")
-	req.Set("Authorization", authToken)
+	req.Set("Authorization", ci.AuthToken)
 	req.Body(`{"request":"` + htpRequest + `"}`)
-	return req
+	return req, nil
 }
 
 /*----------------------------------------------------------------------------*/
 /* Creates an HTTP request to a signing service specified by the user to      */
 /* return the public part of a signature key                                  */
 /*----------------------------------------------------------------------------*/
-func CreateGetPublicKeyRequest(sigkeyToken string, urlStart string,
+func CreateGetPublicKeyRequest(sigkeyToken string, ssURL string,
 		sigkey string) *rest.Request {
 
-	url := urlStart + "/keys/" + sigkey
+	url := ssURL + "/keys/" + sigkey
 	req := rest.GetRequest(url)
 	req.Set("Content-type", "application/json")
 	req.Set("Authorization", sigkeyToken)
@@ -84,10 +93,10 @@ func CreateGetPublicKeyRequest(sigkeyToken string, urlStart string,
 /* Creates an HTTP request to a signing service specified by the user to      */
 /* sign data using a signature key                                            */
 /*----------------------------------------------------------------------------*/
-func CreateSignDataRequest(sigkeyToken string, urlStart string,
+func CreateSignDataRequest(sigkeyToken string, ssURL string,
 		sigkey string, dataToSign string) *rest.Request {
 
-	url := urlStart + "/sign/" + sigkey
+	url := ssURL + "/sign/" + sigkey
 	req := rest.PostRequest(url)
 	req.Set("Content-type", "application/json")
 	req.Set("Authorization", sigkeyToken)

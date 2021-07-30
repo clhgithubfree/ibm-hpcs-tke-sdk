@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/09/2021    CLH             Initial version
+// 07/29/2021    CLH             Add SSUrl to CommonInputs
 
 package tkesdk
 
@@ -15,6 +16,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/IBM/ibm-hpcs-tke-sdk/common"
 	"github.com/IBM/ibm-hpcs-tke-sdk/ep11cmds"
 )
 
@@ -28,16 +30,17 @@ const XCP_ADMP_ZERO_1SIGN = 0x00000040
 /* Inputs:                                                                    */
 /* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
 /*      functions.  This includes: the API endpoint and region, the HPCS      */
-/*      service instance id, and an IBM Cloud authentication token.           */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* HsmConfig -- A structure containing information from the hsm_config        */
 /*      section of the resource block for the HPCS service instance.  This    */
 /*      provides access to signature keys for signing commands to crypto      */
 /*      units.                                                                */
 /*----------------------------------------------------------------------------*/
-func Zeroize(ci CommonInputs, hc HsmConfig) error {
+func Zeroize(ci common.CommonInputs, hc HsmConfig) error {
 
 	// Query the initial configuration of the crypto units
-	hsminfo, urlStart, domains, err := internalQuery(ci)
+	hsminfo, domains, err := internalQuery(ci)
 	if err != nil {
 		return err
 	}
@@ -57,8 +60,8 @@ func Zeroize(ci CommonInputs, hc HsmConfig) error {
 		sigkeySkis := make([]string, 0)
 		sigkeyTokens := make([]string, 0)
 		for i := 0; i < len(hsminfo); i++ {
-			err := ep11cmds.ZeroizeDomain(ci.AuthToken, urlStart, domains[i],
-				sigkeys, sigkeySkis, sigkeyTokens)
+			err := ep11cmds.ZeroizeDomain(ci, domains[i], sigkeys, sigkeySkis,
+				sigkeyTokens)
 			if err != nil {
 				return err
 			}
@@ -69,14 +72,14 @@ func Zeroize(ci CommonInputs, hc HsmConfig) error {
 	// Check that all signature keys specified in the resource block can be
 	// accessed
 	for _, adminInfo := range hc.Admins {
-		if !validKey(adminInfo) {
+		if !validKey(adminInfo, ci.SSUrl) {
 			return errors.New("One or more signature keys cannot be accessed.")
 		}
 	}
 
 	// Determine what signature keys are available
 	suppliedSkis, sigKeyMap, sigKeyTokenMap, _, err :=
-		GetSignatureKeysFromResourceBlock(hc)
+		GetSignatureKeysFromResourceBlock(hc, ci.SSUrl)
 	if err != nil {
 		return err
 	}
@@ -84,7 +87,7 @@ func Zeroize(ci CommonInputs, hc HsmConfig) error {
 	// Determine the zeroize with one signature attribute for all crypto units
 	zeroizeWithOne := make([]bool, 0)
 	for i := 0; i < len(domains); i++ {
-		attr, _, err := ep11cmds.QueryDomainAttributes(ci.AuthToken, urlStart, domains[i])
+		attr, _, err := ep11cmds.QueryDomainAttributes(ci, domains[i])
 		if err != nil {
 			return err
 		}
@@ -94,7 +97,7 @@ func Zeroize(ci CommonInputs, hc HsmConfig) error {
 	// Read the installed administrators for all crypto units
 	installedAdminSkis := make([][]string, 0)
 	for i := 0; i < len(domains); i++ {
-		skiBytes, err := ep11cmds.QueryDomainAdmins(ci.AuthToken, urlStart, domains[i])
+		skiBytes, err := ep11cmds.QueryDomainAdmins(ci, domains[i])
 		if err != nil {
 			return err
 		}
@@ -168,8 +171,8 @@ func Zeroize(ci CommonInputs, hc HsmConfig) error {
 		}
 
 		// Zeroize the crypto unit
-		err := ep11cmds.ZeroizeDomain(ci.AuthToken, urlStart, domains[i],
-			sigkeys, sigkeySkis, sigkeyTokens)
+		err := ep11cmds.ZeroizeDomain(ci, domains[i], sigkeys, sigkeySkis,
+			sigkeyTokens)
 		if err != nil {
 			return err
 		}

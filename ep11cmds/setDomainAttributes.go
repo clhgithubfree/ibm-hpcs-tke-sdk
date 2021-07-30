@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/09/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -18,8 +19,10 @@ import (
 /* Sets the domain attributes                                                 */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose attributes are to be set        */
 /* DomainAttributes -- new set of attributes to be loaded in the domain       */
 /* []string -- identifies the signature keys to use to sign the command       */
@@ -29,19 +32,20 @@ import (
 /* Outputs:                                                                   */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func SetDomainAttributes(authToken string, urlStart string,
+func SetDomainAttributes(ci common.CommonInputs,
 	de common.DomainEntry, newAttributes DomainAttributes,
 	sigkeys []string, sigkeySkis []string, sigkeyTokens []string) error {
 
 	htpRequestString, err := SetDomainAttributesReq(
-		authToken, urlStart, de, newAttributes, sigkeys, sigkeySkis,
-		sigkeyTokens)
+		ci, de, newAttributes, sigkeys, sigkeySkis, sigkeyTokens)
 	if err != nil {
 		return err
 	}
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -59,7 +63,7 @@ func SetDomainAttributes(authToken string, urlStart string,
 /*----------------------------------------------------------------------------*/
 /* Creates the HTPRequest for setting the domain attributes                   */
 /*----------------------------------------------------------------------------*/
-func SetDomainAttributesReq(authToken string, urlStart string, de common.DomainEntry,
+func SetDomainAttributesReq(ci common.CommonInputs, de common.DomainEntry,
 	newAttributes DomainAttributes, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) (string, error) {
 
@@ -79,6 +83,5 @@ func SetDomainAttributesReq(authToken string, urlStart string, de common.DomainE
 	copy(adminBlk.CmdInput[24:28], []byte{0x00, 0x00, 0x00, 0x04})
 	copy(adminBlk.CmdInput[28:32], common.Uint32To4ByteSlice(newAttributes.OperationalMode))
 
-	return CreateSignedHTPRequest(authToken, urlStart, de, adminBlk, sigkeys,
-		sigkeySkis, sigkeyTokens)
+	return CreateSignedHTPRequest(ci, de, adminBlk, sigkeys, sigkeySkis, sigkeyTokens)
 }

@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/09/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -15,7 +16,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"os"
 
 	"github.com/IBM/ibm-hpcs-tke-sdk/common"
 )
@@ -73,17 +73,15 @@ var OID_ecdsaWithSHA512 = []byte{
 /* []string sigkeys -- identifies the signature keys to be used               */
 /* []string sigkeySkis -- the Subject Key Identifiers for the signature keys  */
 /* []string sigkeyTokens -- authentication tokens for the signature keys      */
+/* string ssURL -- URL and port where a signing service is running, if one    */
+/*     should be used                                                         */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* []byte -- a set of concatenated ASN.1 structures, one for each signature   */
 /* error -- reports any error encountered                                     */
 /*----------------------------------------------------------------------------*/
 func CreateSignerInfo(dataToSign []byte, sigkeys []string,
-	sigkeySkis []string, sigkeyTokens []string) ([]byte, error) {
-
-	// Check if the environment variable is set indicating a signing service
-	// should be used
-	ssURL := os.Getenv("TKE_SIGNSERV_URL")
+	sigkeySkis []string, sigkeyTokens []string, ssURL string) ([]byte, error) {
 
 	finalResult := make([]byte, 0)
 	for i := 0; i < len(sigkeys); i++ {
@@ -93,7 +91,7 @@ func CreateSignerInfo(dataToSign []byte, sigkeys []string,
 		if ssURL != "" {
 			// Only P521 EC keys are supported when signing service is used
 			signerInfoFields, err = CreateP521ECSignerInfoFields(
-				dataToSign, sigkeys[i], sigkeySkis[i], sigkeyTokens[i])
+				dataToSign, sigkeys[i], sigkeySkis[i], sigkeyTokens[i], ssURL)
 			if err != nil {
 				return nil, err
 			}
@@ -115,7 +113,7 @@ func CreateSignerInfo(dataToSign []byte, sigkeys []string,
 			if skfields["keyType"] == "p521ec" {
 				// Use a P521 EC signature key
 				signerInfoFields, err = CreateP521ECSignerInfoFields(
-					dataToSign, sigkeys[i], sigkeySkis[i], sigkeyTokens[i])
+					dataToSign, sigkeys[i], sigkeySkis[i], sigkeyTokens[i], ssURL)
 				if err != nil {
 					return nil, err
 				}
@@ -144,6 +142,8 @@ func CreateSignerInfo(dataToSign []byte, sigkeys []string,
 /* string sigkey -- identifies the signature key to use                       */
 /* string sigkeySki -- Subject Key Identifier for the signature key           */
 /* string sigkeyToken -- authentication token for the signature key           */
+/* string ssURL -- URL and port where a signing service is running, if one    */
+/*     is to be used                                                          */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* [][]byte -- a set of ASN.1 OCTET STRINGS that will form SignerInfo         */
@@ -151,7 +151,7 @@ func CreateSignerInfo(dataToSign []byte, sigkeys []string,
 /* error -- reports any error encountered                                     */
 /*----------------------------------------------------------------------------*/
 func CreateP521ECSignerInfoFields(dataToSign []byte, sigkey string,
-	sigkeySki string, sigkeyToken string) ([][]byte, error) {
+	sigkeySki string, sigkeyToken string, ssURL string) ([][]byte, error) {
 
 	signerInfoFields := make([][]byte, 5)
 	signerInfoFields[0] = VERSION_3
@@ -173,7 +173,7 @@ func CreateP521ECSignerInfoFields(dataToSign []byte, sigkey string,
 	signerInfoFields[3] = common.Asn1FormSequence(algIdFields)
 
 	signature, err := common.SignWithSignatureKey(
-		dataToSign, sigkey, sigkeyToken)
+		dataToSign, sigkey, sigkeyToken, ssURL)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func Create2048RSASignerInfoFields(dataToSign []byte, sigkey string,
 	signerInfoFields[3] = common.Asn1FormSequence(algIdFields)
 
 	signature, err := common.SignWithSignatureKey(
-		dataToSign, sigkey, sigkeyToken)
+		dataToSign, sigkey, sigkeyToken, "")
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 05/04/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -19,8 +20,10 @@ import (
 /* Loads the new wrapping key register.                                       */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose new wrapping key register is    */
 /*    to be loaded.                                                           */
 /* [][]byte -- array of recipient info, one entry per key part                */
@@ -32,7 +35,7 @@ import (
 /* Output:                                                                    */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func ImportWK(authToken string, urlStart string, de common.DomainEntry,
+func ImportWK(ci common.CommonInputs, de common.DomainEntry,
 	recipientInfo [][]byte, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) error {
 
@@ -43,7 +46,7 @@ func ImportWK(authToken string, urlStart string, de common.DomainEntry,
 	// Issue Query Domain Attributes to get the administrative domain,
 	// the module identifier, the transaction counter, and the
 	// signature thresholds
-	_, adminRspBlk, err := QueryDomainAttributes(authToken, urlStart, de)
+	_, adminRspBlk, err := QueryDomainAttributes(ci, de)
 	if err != nil {
 		return err
 	}
@@ -68,7 +71,7 @@ func ImportWK(authToken string, urlStart string, de common.DomainEntry,
 
 		// Sign the admin block
 		signerInfo, err := CreateSignerInfo(adminBlockSeq, sigkeys,
-			sigkeySkis, sigkeyTokens)
+			sigkeySkis, sigkeyTokens, ci.SSUrl)
 		if err != nil {
 			return err
 		}
@@ -110,8 +113,10 @@ func ImportWK(authToken string, urlStart string, de common.DomainEntry,
 	xpNumRequest := NewXPNUMRequest(de.GetCryptoModuleIndex(),
 		de.GetDomainIndex(), bigAdminReqSeq)
 
-	xpNumReq := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, xpNumRequest)
+	xpNumReq, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, xpNumRequest)
+	if err != nil {
+		return err
+	}
 
 	htpResponse, err := common.SubmitHTPRequest(xpNumReq)
 	if err != nil {

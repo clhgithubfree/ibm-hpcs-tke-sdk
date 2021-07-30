@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/07/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -43,8 +44,10 @@ const XCP_ADMINT_STD = 5
 /* Queries the domain attributes                                              */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain to be queried                         */
 /*                                                                            */
 /* Outputs:                                                                   */
@@ -55,8 +58,8 @@ const XCP_ADMINT_STD = 5
 /*    that should be used for the signed command.                             */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func QueryDomainAttributes(authToken string, urlStart string,
-	de common.DomainEntry) (DomainAttributes, AdminRspBlk, error) {
+func QueryDomainAttributes(ci common.CommonInputs, de common.DomainEntry) (DomainAttributes,
+	AdminRspBlk, error) {
 
 	var domainAttributes DomainAttributes
 	var adminRspBlk AdminRspBlk
@@ -64,8 +67,10 @@ func QueryDomainAttributes(authToken string, urlStart string,
 	htpRequestString := QueryDomainAttributesReq(
 		de.GetCryptoModuleIndex(), de.GetDomainIndex())
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return domainAttributes, adminRspBlk, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {

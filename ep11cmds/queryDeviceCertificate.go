@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/07/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -20,8 +21,10 @@ import (
 /* Reads an OA certificate                                                    */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the crypto module and domain to be queried       */
 /* certificateIndex -- index into the certificate chain                       */
 /*    0 = currently active epoch key, 1 = its parent, etc.                    */
@@ -30,14 +33,16 @@ import (
 /* []byte -- the returned OA certificate                                      */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func QueryDeviceCertificate(authToken string, urlStart string,
-	de common.DomainEntry, certificateIndex uint32) ([]byte, error) {
+func QueryDeviceCertificate(ci common.CommonInputs, de common.DomainEntry,
+	certificateIndex uint32) ([]byte, error) {
 
 	htpRequestString := QueryDeviceCertificateReq(
 		de.GetCryptoModuleIndex(), de.GetDomainIndex(), certificateIndex)
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return nil, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -82,22 +87,26 @@ func QueryDeviceCertificateReq(cryptoModuleIndex int, domainIndex int,
 /* Returns the number of OA certificates in the OA certificate chain          */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the crypto module and domain to be queried       */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* uint32 -- the number of certificates in the OA certificate chain           */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func QueryNumberDeviceCertificates(authToken string, urlStart string,
+func QueryNumberDeviceCertificates(ci common.CommonInputs,
 	de common.DomainEntry) (uint32, error) {
 
 	htpRequestString := QueryNumberDeviceCertificatesReq(
 		de.GetCryptoModuleIndex(), de.GetDomainIndex())
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return 0, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {

@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/09/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -23,7 +24,7 @@ import (
 )
 
 // Request to generate 2048-bit RSA importer key
-const XCP_IMPRKEY_RSA_2048 = 0 //@T390301CLH
+const XCP_IMPRKEY_RSA_2048 = 0
 // Request to generate P521 EC importer key
 const XCP_IMPRKEY_EC_P521 = 3 //@T390301CLH
 
@@ -31,8 +32,10 @@ const XCP_IMPRKEY_EC_P521 = 3 //@T390301CLH
 /* Generates a 2048-bit RSA importer key.                                     */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose attributes are to be set        */
 /* []string -- identifies the signature keys to use to sign the command       */
 /* []string -- the Subject Key Identifiers for the signature keys             */
@@ -43,7 +46,7 @@ const XCP_IMPRKEY_EC_P521 = 3 //@T390301CLH
 /* []byte -- the Subject Key Identifier of the RSA public key                 */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func Generate2048RSAImporterKey(authToken string, urlStart string,
+func Generate2048RSAImporterKey(ci common.CommonInputs,
 	de common.DomainEntry, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) (rsa.PublicKey, []byte, error) {
 
@@ -51,14 +54,15 @@ func Generate2048RSAImporterKey(authToken string, urlStart string,
 	var ski []byte
 
 	htpRequestString, err := GenerateImporterKeyRequest(
-		authToken, urlStart, de, XCP_IMPRKEY_RSA_2048, sigkeys, sigkeySkis,
-		sigkeyTokens)
+		ci, de, XCP_IMPRKEY_RSA_2048, sigkeys, sigkeySkis, sigkeyTokens)
 	if err != nil {
 		return pubKey, ski, err
 	}
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return pubKey, ski, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -122,8 +126,10 @@ func (info *RecipientInfo2048) Initialize(ski []byte, encrKey []byte) {
 /* Generates a P521 EC importer key.                                          */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose attributes are to be set        */
 /* []string -- identifies the signature keys to use to sign the command       */
 /* []string -- the Subject Key Identifiers for the signature keys             */
@@ -134,7 +140,7 @@ func (info *RecipientInfo2048) Initialize(ski []byte, encrKey []byte) {
 /* []byte -- the Subject Key Identifier of the EC public key                  */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func GenerateP521ECImporterKey(authToken string, urlStart string,
+func GenerateP521ECImporterKey(ci common.CommonInputs,
 	de common.DomainEntry, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) (ecdsa.PublicKey, []byte, error) {
 
@@ -142,14 +148,16 @@ func GenerateP521ECImporterKey(authToken string, urlStart string,
 	var ski []byte
 
 	htpRequestString, err := GenerateImporterKeyRequest(
-		authToken, urlStart, de, XCP_IMPRKEY_EC_P521, sigkeys, sigkeySkis,
+		ci, de, XCP_IMPRKEY_EC_P521, sigkeys, sigkeySkis,
 		sigkeyTokens)
 	if err != nil {
 		return pubKey, ski, err
 	}
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return pubKey, ski, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -203,7 +211,7 @@ func GenerateP521ECImporterKeyResponse(htpResponse string, de common.DomainEntry
 /*----------------------------------------------------------------------------*/
 /* Creates the HTPRequest for generating a domain importer key                */
 /*----------------------------------------------------------------------------*/
-func GenerateImporterKeyRequest(authToken string, urlStart string, de common.DomainEntry,
+func GenerateImporterKeyRequest(ci common.CommonInputs, de common.DomainEntry,
 	importerKeyType uint32, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) (string, error) {
 
@@ -214,6 +222,6 @@ func GenerateImporterKeyRequest(authToken string, urlStart string, de common.Dom
 	// transaction counter filled in later
 	adminBlk.CmdInput = common.Uint32To4ByteSlice(importerKeyType)
 
-	return CreateSignedHTPRequest(authToken, urlStart, de, adminBlk, sigkeys,
+	return CreateSignedHTPRequest(ci, de, adminBlk, sigkeys,
 		sigkeySkis, sigkeyTokens)
 }

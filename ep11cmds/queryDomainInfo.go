@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/07/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -33,8 +34,10 @@ type DomainInfoRspInfo struct {
 /* Queries the domain master key register status and verification pattern     */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain to be queried                         */
 /*                                                                            */
 /* Outputs:                                                                   */
@@ -42,14 +45,16 @@ type DomainInfoRspInfo struct {
 /*    new and current master key registers                                    */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func QueryDomainInfo(authToken string, urlStart string,
-	de common.DomainEntry) (DomainInfoRspInfo, error) {
+func QueryDomainInfo(ci common.CommonInputs, de common.DomainEntry) (DomainInfoRspInfo, error) {
 
 	htpRequestString := QueryDomainInfoRequest(
 		de.GetCryptoModuleIndex(), de.GetDomainIndex())
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		var dummy DomainInfoRspInfo
+		return dummy, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {

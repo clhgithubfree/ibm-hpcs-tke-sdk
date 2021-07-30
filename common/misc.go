@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/30/2021    CLH             Modify for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package common
 
@@ -30,27 +31,9 @@ import (
 	"strings"
 )
 
-var DomainsFileName = "DOMAINS"
-var CryptoModulesFileName = "CRYPTOMODULES"
 
-/** Entry in the DOMAINS file describing a single domain.  This version
-  lacks a "type" field. */
-type DomainEntryNoType struct {
-	Domain_num int    `json:"domain_num"`
-	Hsm_id     string `json:"hsm_id"`
-	// UUID for this particular domain
-	Crypto_instance_id string `json:"crypto_instance_id"`
-	// UUID for the crypto instance containing this domain
-	Location string `json:"location"`
-	// Describes the location of the domain
-	// Format is [Availability zone].[Host].[Crypto module index].[domain index]
-	Serial_num string `json:"serial_num"`
-	Public_key string `json:"public_key"`
-	Selected   bool   `json:"selected"`
-	// Indicates whether the user has selected this domain to work with
-}
-
-/** Entry in the DOMAINS file describing a single domain */
+/** Characteristics of a single domain (crypto unit) assigned to an HPCS 
+ *  service instance. */
 type DomainEntry struct {
 	Domain_num int    `json:"domain_num"`
 	Hsm_id     string `json:"hsm_id"`
@@ -62,16 +45,10 @@ type DomainEntry struct {
 	// Format is [Availability zone].[Host].[Crypto module index].[domain index]
 	Serial_num string `json:"serial_num"`
 	Public_key string `json:"public_key"`
-	Type       string `json:"type"` //@T390301CLH
-	// "operational" or "recovery"  //@T407032CLH
+	Type       string `json:"type"`
+	// "operational", "recovery", or "failover"
 	Selected bool `json:"selected"`
 	// Indicates whether the user has selected this domain to work with
-}
-
-/** Entry in the CRYPTOMODULES file */
-type CryptoModuleEntry struct {
-	Serial_num string `json:"serial_num"`
-	Public_key string `json:"public_key"`
 }
 
 type RotateStatus struct {
@@ -84,6 +61,17 @@ type ECPublicKey struct {
 	X *big.Int
 	Y *big.Int
 }
+
+// Structure containing common inputs to TKE SDK commands
+// All TKE SDK commands need these inputs
+type CommonInputs struct {
+	Region      string
+	ApiEndpoint string
+	AuthToken   string
+	InstanceId  string
+    SSUrl       string
+}
+
 
 /*----------------------------------------------------------------------------*/
 /* Returns the crypto module index from the Location field of a DomainEntry   */

@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 05/04/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -223,7 +224,7 @@ func CreateAdminCertUsingSigningService(ssURL string, sigkey string,
 
 	// Calculate the signature
 	hash := sha512.Sum512(certBase)
-	signature, err := common.SignWithSignatureKey(hash[:], sigkey, sigkeyToken)
+	signature, err := common.SignWithSignatureKey(hash[:], sigkey, sigkeyToken, ssURL)
 	if err != nil {
 		return make([]byte, 0), err
 	}

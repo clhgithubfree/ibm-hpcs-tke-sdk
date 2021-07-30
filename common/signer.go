@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/19/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package common
 
@@ -25,7 +26,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"math/big"
-	"os"
 )
 
 
@@ -44,16 +44,15 @@ type ECSignature struct {
 /* dataToSign []byte -- the data to be signed                                 */
 /* sigkey string -- identifies the signature key to use                       */
 /* sigkeyToken string -- authentication token for the signature key           */
+/* ssURL string -- the URL and port where the signing service is running, if  */
+/*     one is used                                                            */
 /*                                                                            */
 /* Outputs:                                                                   */
 /* []byte -- the calculated signature                                         */
 /* error -- any error encountered                                             */
 /*----------------------------------------------------------------------------*/
-func SignWithSignatureKey(dataToSign []byte, sigkey string, sigkeyToken string) ([]byte, error) {
+func SignWithSignatureKey(dataToSign []byte, sigkey string, sigkeyToken string, ssURL string) ([]byte, error) {
 
-	// Check if the environment variable is set indicating a signing service
-	// should be used
-	ssURL := os.Getenv("TKE_SIGNSERV_URL")
 	if ssURL != "" {
 		// Use the signing service to create the signature
 		encodedData := base64.StdEncoding.EncodeToString(dataToSign)

@@ -28,8 +28,10 @@ import (
 /* register are not empty, an error is returned.                              */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain where a random value is to be loaded  */
 /*    in one of the wrapping key registers                                    */
 /* []string -- identifies the signature keys to use to sign the command       */
@@ -40,17 +42,18 @@ import (
 /* error -- reports any errors for the operation                              */
 /* []byte -- the verification pattern of the generated master key value       */
 /*----------------------------------------------------------------------------*/
-func CreateRandomWK(authToken string, urlStart string, de common.DomainEntry,
+func CreateRandomWK(ci common.CommonInputs, de common.DomainEntry,
 	sigkeys []string, sigkeySkis []string, sigkeyTokens []string) (error, []byte) {
 
-	htpRequestString, err := CreateRandomWKReq(authToken, urlStart, de,
-		sigkeys, sigkeySkis, sigkeyTokens)
+	htpRequestString, err := CreateRandomWKReq(ci, de, sigkeys, sigkeySkis, sigkeyTokens)
 	if err != nil {
 		return err, nil
 	}
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return err, nil
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -70,8 +73,10 @@ func CreateRandomWK(authToken string, urlStart string, de common.DomainEntry,
 /* key registers                                                              */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain where a random value is to be loaded  */
 /*    in one of the wrapping key registers                                    */
 /* []string -- identifies the signature keys to use to sign the command       */
@@ -82,7 +87,7 @@ func CreateRandomWK(authToken string, urlStart string, de common.DomainEntry,
 /* string -- the HTPRequest string with the signed CPRB for the command       */
 /* error -- reports any errors                                                */
 /*----------------------------------------------------------------------------*/
-func CreateRandomWKReq(authToken string, urlStart string, de common.DomainEntry,
+func CreateRandomWKReq(ci common.CommonInputs, de common.DomainEntry,
 	sigkeys []string, sigkeySkis []string, sigkeyTokens []string) (string, error) {
 
 	var adminBlk AdminBlk
@@ -91,6 +96,5 @@ func CreateRandomWKReq(authToken string, urlStart string, de common.DomainEntry,
 	// module ID filled in later
 	// transaction counter filled in later
 	// no input parameters
-	return CreateSignedHTPRequest(authToken, urlStart, de, adminBlk,
-		sigkeys, sigkeySkis, sigkeyTokens)
+	return CreateSignedHTPRequest(ci, de, adminBlk, sigkeys, sigkeySkis, sigkeyTokens)
 }

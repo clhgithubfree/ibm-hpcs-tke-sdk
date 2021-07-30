@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/09/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -26,8 +27,10 @@ import (
 /* The output would be a concatenated set of RecipientInfo structures.        */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose current wrapping key register   */
 /*    is to be exported                                                       */
 /* []byte -- parameter file with format described in section 5.3 ("Serialized */
@@ -41,18 +44,19 @@ import (
 /* []byte -- single RecipientInfo structure containing the encrypted key part */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func ExportWK(authToken string, urlStart string, de common.DomainEntry,
-	pfile []byte, sigkeys []string, sigkeySkis []string,
-	sigkeyTokens []string) ([]byte, error) {
+func ExportWK(ci common.CommonInputs, de common.DomainEntry, pfile []byte,
+	sigkeys []string, sigkeySkis []string, sigkeyTokens []string) ([]byte, error) {
 
-	htpRequestString, err := ExportWKReq(authToken, urlStart, de, pfile,
-		sigkeys, sigkeySkis, sigkeyTokens)
+	htpRequestString, err := ExportWKReq(ci, de, pfile, sigkeys, sigkeySkis,
+		sigkeyTokens)
 	if err != nil {
 		return nil, err
 	}
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return nil, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -71,8 +75,10 @@ func ExportWK(authToken string, urlStart string, de common.DomainEntry,
 /* Creates the HTPRequest for exporting the current wrapping key register     */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose current wrapping key register   */
 /*    is to be exported                                                       */
 /* []byte -- parameter file with format described in section 5.3 ("Serialized */
@@ -86,7 +92,7 @@ func ExportWK(authToken string, urlStart string, de common.DomainEntry,
 /* string -- the HTPRequest string with the signed CPRB for the command       */
 /* error -- reports any errors                                                */
 /*----------------------------------------------------------------------------*/
-func ExportWKReq(authToken string, urlStart string, de common.DomainEntry,
+func ExportWKReq(ci common.CommonInputs, de common.DomainEntry,
 	pfile []byte, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) (string, error) {
 
@@ -96,16 +102,17 @@ func ExportWKReq(authToken string, urlStart string, de common.DomainEntry,
 	// module ID filled in later
 	// transaction counter filled in later
 	adminBlk.CmdInput = pfile
-	return CreateSignedHTPRequest(authToken, urlStart, de, adminBlk, sigkeys,
-		sigkeySkis, sigkeyTokens)
+	return CreateSignedHTPRequest(ci, de, adminBlk, sigkeys, sigkeySkis, sigkeyTokens)
 }
 
 /*----------------------------------------------------------------------------*/
 /* Exports the pending wrapping key register                                  */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose pending wrapping key register   */
 /*    is to be exported                                                       */
 /* []byte -- parameter file with format described in section 5.3 ("Serialized */
@@ -119,18 +126,20 @@ func ExportWKReq(authToken string, urlStart string, de common.DomainEntry,
 /* []byte -- raw encrypted key parts                                          */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func ExportPendingWK(authToken string, urlStart string, de common.DomainEntry,
+func ExportPendingWK(ci common.CommonInputs, de common.DomainEntry,
 	pfile []byte, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) ([]byte, error) {
 
-	htpRequestString, err := ExportPendingWKReq(authToken, urlStart, de, pfile,
-		sigkeys, sigkeySkis, sigkeyTokens)
+	htpRequestString, err := ExportPendingWKReq(ci, de, pfile, sigkeys,
+		sigkeySkis, sigkeyTokens)
 	if err != nil {
 		return nil, err
 	}
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return nil, err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -149,8 +158,10 @@ func ExportPendingWK(authToken string, urlStart string, de common.DomainEntry,
 /* Creates the HTPRequest for exporting the pending wrapping key register     */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose pending wrapping key register   */
 /*    is to be exported                                                       */
 /* []byte -- parameter file with format described in section 5.3 ("Serialized */
@@ -164,7 +175,7 @@ func ExportPendingWK(authToken string, urlStart string, de common.DomainEntry,
 /* string -- the HTPRequest string with the signed CPRB for the command       */
 /* error -- reports any errors                                                */
 /*----------------------------------------------------------------------------*/
-func ExportPendingWKReq(authToken string, urlStart string, de common.DomainEntry,
+func ExportPendingWKReq(ci common.CommonInputs, de common.DomainEntry,
 	pfile []byte, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) (string, error) {
 
@@ -174,8 +185,7 @@ func ExportPendingWKReq(authToken string, urlStart string, de common.DomainEntry
 	// module ID filled in later
 	// transaction counter filled in later
 	adminBlk.CmdInput = pfile
-	return CreateSignedHTPRequest(authToken, urlStart, de, adminBlk,
-		sigkeys, sigkeySkis, sigkeyTokens)
+	return CreateSignedHTPRequest(ci, de, adminBlk, sigkeys, sigkeySkis, sigkeyTokens)
 }
 
 /*----------------------------------------------------------------------------*/

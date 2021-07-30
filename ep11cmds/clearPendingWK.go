@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/09/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -18,8 +19,10 @@ import (
 /* Clears the pending wrapping key register                                   */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose pending wrapping key register   */
 /*    is to be cleared                                                        */
 /* []string -- identifies the signature keys to use to sign the command       */
@@ -29,17 +32,19 @@ import (
 /* Outputs:                                                                   */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func ClearPendingWK(authToken string, urlStart string, de common.DomainEntry,
+func ClearPendingWK(ci common.CommonInputs, de common.DomainEntry,
 	sigkeys []string, sigkeySkis []string, sigkeyTokens []string) error {
 
-	htpRequestString, err := ClearPendingWKReq(authToken, urlStart, de,
-		sigkeys, sigkeySkis, sigkeyTokens)
+	htpRequestString, err := ClearPendingWKReq(ci, de, sigkeys, sigkeySkis,
+		sigkeyTokens)
 	if err != nil {
 		return err
 	}
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -57,7 +62,7 @@ func ClearPendingWK(authToken string, urlStart string, de common.DomainEntry,
 /*----------------------------------------------------------------------------*/
 /* Creates the HTPRequest for clearing the pending wrapping key register      */
 /*----------------------------------------------------------------------------*/
-func ClearPendingWKReq(authToken string, urlStart string, de common.DomainEntry,
+func ClearPendingWKReq(ci common.CommonInputs, de common.DomainEntry,
 	sigkeys []string, sigkeySkis []string, sigkeyTokens []string) (string, error) {
 
 	var adminBlk AdminBlk
@@ -66,6 +71,5 @@ func ClearPendingWKReq(authToken string, urlStart string, de common.DomainEntry,
 	// module ID filled in later
 	// transaction counter filled in later
 	// no payload
-	return CreateSignedHTPRequest(authToken, urlStart, de, adminBlk,
-		sigkeys, sigkeySkis, sigkeyTokens)
+	return CreateSignedHTPRequest(ci, de, adminBlk, sigkeys, sigkeySkis, sigkeyTokens)
 }

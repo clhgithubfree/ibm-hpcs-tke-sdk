@@ -7,6 +7,7 @@
 //
 // Date          Initials        Description
 // 04/09/2021    CLH             Adapt for TKE SDK
+// 07/30/2021    CLH             Add SSUrl to CommonInputs
 
 package ep11cmds
 
@@ -18,8 +19,10 @@ import (
 /* Adds a domain administrator                                                */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain where an administrator is to be added */
 /* []byte -- certificate containing the public key for the administrator      */
 /* []string -- identifies the signature keys to use to sign the command       */
@@ -29,18 +32,20 @@ import (
 /* Outputs:                                                                   */
 /* error -- reports any errors for the operation                              */
 /*----------------------------------------------------------------------------*/
-func AddDomainAdmin(authToken string, urlStart string, de common.DomainEntry,
+func AddDomainAdmin(ci common.CommonInputs, de common.DomainEntry,
 	cert []byte, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) error {
 
 	htpRequestString, err := AddDomainAdminReq(
-		authToken, urlStart, de, cert, sigkeys, sigkeySkis, sigkeyTokens)
+		ci, de, cert, sigkeys, sigkeySkis, sigkeyTokens)
 	if err != nil {
 		return err
 	}
 
-	req := common.CreatePostHsmsRequest(
-		authToken, urlStart, de.Crypto_instance_id, de.Hsm_id, htpRequestString)
+	req, err := common.CreatePostHsmsRequest(ci, de.Hsm_id, htpRequestString)
+	if err != nil {
+		return err
+	}
 
 	htpResponseString, err := common.SubmitHTPRequest(req)
 	if err != nil {
@@ -59,8 +64,10 @@ func AddDomainAdmin(authToken string, urlStart string, de common.DomainEntry,
 /* Creates the HTPRequest for adding a domain administrator                   */
 /*                                                                            */
 /* Inputs:                                                                    */
-/* authToken -- the authority token to use for the request                    */
-/* urlStart -- the base URL to use for the request                            */
+/* CommonInputs -- A structure containing inputs needed for all TKE SDK       */
+/*      functions.  This includes: the API endpoint and region, the HPCS      */
+/*      service instance id, an IBM Cloud authentication token, and the       */
+/*      URL and port for the signing service if one is used.                  */
 /* DomainEntry -- identifies the domain whose current wrapping key register   */
 /*    is to be exported                                                       */
 /* []byte -- certificate containing the public key for the administrator to   */
@@ -73,7 +80,7 @@ func AddDomainAdmin(authToken string, urlStart string, de common.DomainEntry,
 /* string -- the HTPRequest string with the signed CPRB for the command       */
 /* error -- reports any errors                                                */
 /*----------------------------------------------------------------------------*/
-func AddDomainAdminReq(authToken string, urlStart string, de common.DomainEntry,
+func AddDomainAdminReq(ci common.CommonInputs, de common.DomainEntry,
 	cert []byte, sigkeys []string, sigkeySkis []string,
 	sigkeyTokens []string) (string, error) {
 
@@ -84,6 +91,6 @@ func AddDomainAdminReq(authToken string, urlStart string, de common.DomainEntry,
 	// transaction counter filled in later
 	// the certificate is the payload
 	adminBlk.CmdInput = cert
-	return CreateSignedHTPRequest(authToken, urlStart, de, adminBlk, sigkeys,
-		sigkeySkis, sigkeyTokens)
+	return CreateSignedHTPRequest(ci, de, adminBlk, sigkeys, sigkeySkis,
+		sigkeyTokens)
 }
