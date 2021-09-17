@@ -132,7 +132,7 @@ func VerifyOA2Certificate(authToken string, urlStart string, de common.DomainEnt
 	var x, y big.Int
 	x.SetBytes(xbytes)
 	y.SetBytes(ybytes)
-	pubkey := ecdsa.PublicKey{elliptic.P521(), &x, &y}
+	pubkey := ecdsa.PublicKey{Curve: elliptic.P521(), X: &x, Y: &y}
 
 	// Calculate the SHA-512 hash of the certificate body
 	hasher := sha512.New()
