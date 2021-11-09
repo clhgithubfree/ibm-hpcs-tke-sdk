@@ -665,7 +665,7 @@ func buildAdminRspBlk(htpResponse string, de common.DomainEntry) (AdminRspBlk, e
 		} else {
 			return adminRspBlk, errors.New("Unrecognized format of crypto module public key")
 		}
-		pubkey := ecdsa.PublicKey{elliptic.P521(), &x, &y}
+		pubkey := ecdsa.PublicKey{Curve: elliptic.P521(), X: &x, Y: &y} 
 
 		// Verify the signature
 		var r, s big.Int
