@@ -1,6 +1,12 @@
 <!-- Use FEATURES, ENHANCEMENTS, BUG FIXES as categories describing content. -->
 <!-- Put most recent change at top. -->
 
+## 1.0.3 (June 21, 2024)
+
+FEATURES:
+
+* Support 4770 HSMs
+
 ## 1.0.2 (July 23, 2021)
 
 BUG FIXES:
