@@ -1,7 +1,7 @@
 <!-- Use FEATURES, ENHANCEMENTS, BUG FIXES as categories describing content. -->
 <!-- Put most recent change at top. -->
 
-## 1.0.3 (June 21, 2024)
+## 1.0.3 (February 21, 2025)
 
 FEATURES:
 
